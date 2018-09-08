@@ -1,0 +1,11 @@
+-type name() :: atom() | {'local', term()} | {'global', term()} | {'via', module(), term()}.
+-type spider() :: pid() | name() | {atom(), node()}.
+-type on_start() ::  {'ok', pid()} | 'ignore' |  {'error', {'already_started', pid()} | term()}.
+-type url() :: binary().
+-type option() :: {atom(), term()}.
+-type request() :: list(option()).
+-type response() :: term().
+-type text() :: binary().
+-type selector() :: binary().
+-type reason() :: 'normal' | 'shutdown' | {'shutdown', term()} | term().
+-type version() :: term | {'down', version()}.
