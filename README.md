@@ -1,5 +1,9 @@
 # GenSpider
 
+[![Build Status](https://img.shields.io/travis/sntran/gen_spider/master.svg)](https://travis-ci.org/sntran/gen_spider)
+[![Hex Version](https://img.shields.io/hexpm/v/gen_spider.svg)](https://hex.pm/packages/gen_spider)
+[![License](https://img.shields.io/github/license/sntran/gen_spider.svg)](https://choosealicense.com/licenses/apache-2.0/)
+
 <!-- MDOC !-->
 GenSpider is a behaviour for defining Spiders.
 
