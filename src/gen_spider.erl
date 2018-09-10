@@ -19,6 +19,10 @@
   code_change/3
 ]).
 
+-export_type([
+  option/0
+]).
+
 -include("gen_spider.hrl").
 -include_lib("gen_spider_internal.hrl").
 
@@ -29,6 +33,13 @@
 }).
 
 -callback init(Args :: term()) -> {ok, State :: state()} | ignore | {stop, Reason :: any()}.
+
+-callback start_requests(State :: state()) ->
+  {ok, Requests :: list(), NewState :: state()}.
+
+-optional_callbacks([
+  start_requests/1
+]).
 
 %% ==================================================================
 %% API
@@ -72,9 +83,13 @@ init({Module, Args, Opts}) ->
   Spider = #spider{module=Module, options=Opts},
 
   case erlang:apply(Module, init, [Args]) of
-    {ok, State} -> {ok, Spider#spider{state=State}};
-    ignore -> ignore;
-    {stop, Reason} -> {stop, Reason}
+    {ok, State} ->
+      % returns 0 timeout to start the spider immediately.
+      {ok, Spider#spider{state=State}, 0};
+    {ok, State, Delay} when is_integer(Delay) ->
+      {ok, Spider#spider{state=State}, Delay};
+    Else ->
+      Else
   end.
 
 %% @private
@@ -84,6 +99,22 @@ handle_call(_, _From, Spider) ->
 %% @private
 handle_cast(stop, Spider) ->
   {stop, normal, Spider}.
+
+%% @private
+%% This get called on the initial crawl due to the timeout of 0.
+handle_info(timeout, Spider) ->
+  #spider{module=Module, options=Opts, state=State} = Spider,
+  case proplists:get_value(start_urls, Opts, []) of
+    [] ->
+      case Module:start_requests(State) of
+        {ok, _Requests, NewState} ->
+          {noreply, Spider#spider{state=NewState}};
+        _Else ->
+          {stop, invalid_return, Spider}
+      end;
+    Urls when is_list(Urls) ->
+      {noreply, Spider}
+  end;
 
 %% @private
 % handles exit message, if the gen_server is linked to other processes (than

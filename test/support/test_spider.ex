@@ -14,11 +14,17 @@ defmodule TestSpider do
 
   @type callback :: {atom(), fun}
   @typep state :: any()
+  @typep spider :: list()
 
   ## API
   @spec start([callback], [GenSpider.option]) :: :ignore | {:error, any()} | {:ok, pid()}
   def start(callbacks, options \\ []) do
     GenSpider.start(__MODULE__, callbacks, options)
+  end
+
+  @spec start_link([callback], [GenSpider.option]) :: :ignore | {:error, any()} | {:ok, pid()}
+  def start_link(callbacks, options \\ []) do
+    GenSpider.start_link(__MODULE__, callbacks, options)
   end
 
   ## GenSpider callbacks
@@ -34,6 +40,21 @@ defmodule TestSpider do
       {:ok, state} ->
         spider = Keyword.put(options, :state, state)
         {:ok, spider}
+      {:ok, state, delay} ->
+        spider = Keyword.put(options, :state, state)
+        {:ok, spider, delay}
+      other ->
+        other
+    end
+  end
+
+  @impl true
+  @spec start_requests(spider()) :: {:ok, list(), state()}
+  def start_requests(spider) do
+    state = spider[:state]
+    case maybe_apply(spider, :start_requests, [state], {:ok, [], state}) do
+      {:ok, fetches, state} ->
+        {:ok, fetches, Keyword.put(spider, :state, state)}
       other ->
         other
     end
