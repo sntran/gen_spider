@@ -1,15 +1,15 @@
 defmodule GenSpider do
   @moduledoc "README.md"
-              |> File.read!()
-              |> String.split("<!-- MDOC !-->")
-              |> Enum.fetch!(1)
+             |> File.read!()
+             |> String.split("<!-- MDOC !-->")
+             |> Enum.fetch!(1)
 
   require Logger
 
   @typedoc "Options used by the `start*` functions"
   @type options :: [options]
 
-  @type option :: {:name, GenServer.name}
+  @type option :: {:name, GenServer.name()}
 
   @typep state :: any
 
@@ -35,6 +35,8 @@ defmodule GenSpider do
 
   # Define the callbacks for `GenSpider`
   @callback init(any) ::
-    {:ok, state} | {:ok, state, timeout | :hibernate} |
-    :ignore | {:stop, reason :: term}
+              {:ok, state}
+              | {:ok, state, timeout | :hibernate}
+              | :ignore
+              | {:stop, reason :: term}
 end

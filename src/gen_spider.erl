@@ -24,7 +24,7 @@
 ]).
 
 -include("gen_spider.hrl").
--include_lib("gen_spider_internal.hrl").
+-include("gen_spider_internal.hrl").
 
 -record(spider, {
   module :: module(),
