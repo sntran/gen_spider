@@ -7,9 +7,9 @@ defmodule GenSpider do
   require Logger
 
   @typedoc "Options used by the `start*` functions"
-  @type options :: [options]
+  @type options :: [option]
 
-  @type option :: {:name, GenServer.name()}
+  @type option :: :gen_spider.option()
 
   @typep state :: any
 
@@ -33,10 +33,28 @@ defmodule GenSpider do
   """
   defdelegate start_link(module, args, options), to: :gen_spider
 
+  defdelegate stop(spider), to: :gen_spider
+
   # Define the callbacks for `GenSpider`
   @callback init(any) ::
               {:ok, state}
               | {:ok, state, timeout | :hibernate}
               | :ignore
               | {:stop, reason :: term}
+
+  @callback start_requests(state) :: {:ok, list, state}
+
+  @doc """
+  Elixir-specific child specification for a spider to be supervised.
+  """
+  @spec child_spec([atom() | term() | options()]) :: Supervisor.child_spec()
+  def child_spec([module, args, options]) when is_atom(module) and is_list(options) do
+    %{
+      id: module,
+      start: {__MODULE__, :start_link, [module, args, options]},
+      restart: :transient,
+      shutdown: 5000,
+      type: :worker
+    }
+  end
 end

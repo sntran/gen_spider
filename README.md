@@ -1,10 +1,12 @@
 # GenSpider
 
 [![Build Status](https://img.shields.io/travis/sntran/gen_spider/master.svg)](https://travis-ci.org/sntran/gen_spider)
+[![Test Coverage](https://img.shields.io/coveralls/github/sntran/gen_spider.svg)](https://coveralls.io/github/sntran/gen_spider)
 [![Hex Version](https://img.shields.io/hexpm/v/gen_spider.svg)](https://hex.pm/packages/gen_spider)
 [![License](https://img.shields.io/github/license/sntran/gen_spider.svg)](https://choosealicense.com/licenses/apache-2.0/)
 
 <!-- MDOC !-->
+
 GenSpider is a behaviour for defining Spiders.
 
 Spiders are modules which define how a certain site (or a group of sites) will
@@ -53,8 +55,8 @@ When submitting a pull request you should not update the `CHANGELOG.md`.
 
 ## License
 
-Plug source code is released under Apache 2 License.
+GenSpider source code is released under Apache 2 License.
 Check LICENSE file for more information.
 
-  [issues]: https://github.com/sntran/gen_spider/issues
-  [pulls]: https://github.com/sntran/gen_spider/pulls
+[issues]: https://github.com/sntran/gen_spider/issues
+[pulls]: https://github.com/sntran/gen_spider/pulls

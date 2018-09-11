@@ -2,6 +2,84 @@ defmodule GenSpiderTest do
   use GenSpider.TestCase, async: true
   doctest GenSpider
 
+  setup_all do
+    {:ok, _} = Registry.start_link(keys: :unique, name: Registry.GenSpiderTest)
+
+    start_supervised({DynamicSupervisor, strategy: :one_for_one, name: GenSpider.TestSupervisor})
+
+    :ok
+  end
+
+  describe "start/3" do
+    test "spawns a process" do
+      {:ok, pid} = GenSpider.start(TestSpider, [], [])
+      assert is_pid(pid)
+    end
+
+    test "can be optionally named locally with an atom" do
+      {:ok, pid} = GenSpider.start(TestSpider, [], name: TestSpider)
+
+      assert Process.whereis(TestSpider) === pid
+    end
+
+    test "can be optionally named globally with an atom" do
+      {:ok, pid} = GenSpider.start(TestSpider, [], name: {:global, TestSpider})
+
+      assert :global.whereis_name(TestSpider) === pid
+    end
+
+    test "can be optionally named via another module" do
+      name = {:via, Registry, {Registry.GenSpiderTest, "TestSpider"}}
+      {:ok, pid} = GenSpider.start(TestSpider, [], name: name)
+
+      assert Registry.whereis_name({Registry.GenSpiderTest, "TestSpider"}) === pid
+    end
+  end
+
+  describe "stop/1" do
+    test "stops the spider by pid" do
+      {:ok, pid} = GenSpider.start(TestSpider, [], [])
+      assert Process.alive?(pid)
+      GenSpider.stop(pid)
+      refute Process.alive?(pid)
+    end
+
+    test "stops the spider by local atom name" do
+      {:ok, pid} = GenSpider.start(TestSpider, [], name: StoppableTestSpider)
+
+      assert Process.alive?(pid)
+      GenSpider.stop(StoppableTestSpider)
+      refute Process.alive?(pid)
+    end
+
+    test "stops a global spider" do
+      name = {:global, GlobalTestSpider}
+      {:ok, pid} = GenSpider.start(TestSpider, [], name: name)
+
+      assert Process.alive?(pid)
+      GenSpider.stop(name)
+      refute Process.alive?(pid)
+    end
+
+    test "stops a spider registered via another module" do
+      name = {:via, Registry, {Registry.GenSpiderTest, "BinaryNamedTestSpider"}}
+      {:ok, pid} = GenSpider.start(TestSpider, [], name: name)
+
+      assert Process.alive?(pid)
+      GenSpider.stop(name)
+      refute Process.alive?(pid)
+    end
+  end
+
+  describe "start_link/3" do
+    test "can be used in a supervision tree" do
+      spec = {GenSpider, [TestSpider, [], []]}
+
+      {:ok, spider} = DynamicSupervisor.start_child(GenSpider.TestSupervisor, spec)
+      assert is_pid(spider)
+    end
+  end
+
   describe "@callback init/1" do
     test "is called when started" do
       TestSpider.start(
@@ -81,6 +159,47 @@ defmodule GenSpiderTest do
         start_requests: fn _state ->
           Kernel.send(:tester, {:called_back, :start_requests, 1})
         end
+      )
+
+      refute_receive {:called_back, :start_requests, 1},
+                     100,
+                     "@callback start_requests/1 was not supposed to be called before the delay"
+
+      assert_receive {:called_back, :start_requests, 1},
+                     101,
+                     "@callback start_requests/1 was not called after delay"
+    end
+
+    test "will be delayed if specified in option for `start/3`" do
+      TestSpider.start(
+        [
+          start_requests: fn _state ->
+            Kernel.send(:tester, {:called_back, :start_requests, 1})
+          end
+        ],
+        delay: 100
+      )
+
+      refute_receive {:called_back, :start_requests, 1},
+                     100,
+                     "@callback start_requests/1 was not supposed to be called before the delay"
+
+      assert_receive {:called_back, :start_requests, 1},
+                     101,
+                     "@callback start_requests/1 was not called after delay"
+    end
+
+    test "will be delayed by value in the return of @callback init/1 rather than delay option" do
+      TestSpider.start(
+        [
+          init: fn args ->
+            {:ok, args, 100}
+          end,
+          start_requests: fn _state ->
+            Kernel.send(:tester, {:called_back, :start_requests, 1})
+          end
+        ],
+        delay: 500
       )
 
       refute_receive {:called_back, :start_requests, 1},

@@ -2,7 +2,7 @@
 -type spider() :: pid() | name() | {atom(), node()}.
 -type on_start() ::  {'ok', pid()} | 'ignore' |  {'error', {'already_started', pid()} | term()}.
 -type url() :: binary().
--type option() :: {atom(), term()}.
+-type option() :: {'name', name()} | {'start_urls', list()} | {'allowed_domains', [url()]} | {'delay', non_neg_integer()}.
 -type request() :: list(option()).
 -type response() :: term().
 -type text() :: binary().

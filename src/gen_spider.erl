@@ -1,5 +1,5 @@
 -module(gen_spider).
--author ('dev@sntran.com').
+-author('dev@sntran.com').
 -behaviour(gen_server).
 
 %% API
@@ -20,6 +20,7 @@
 ]).
 
 -export_type([
+  name/0,
   option/0
 ]).
 
@@ -32,10 +33,13 @@
   state :: state()
 }).
 
--callback init(Args :: term()) -> {ok, State :: state()} | ignore | {stop, Reason :: any()}.
+-callback init(Args :: term()) ->
+            {ok, State :: state()}
+            | ignore
+            | {stop, Reason :: any()}.
 
 -callback start_requests(State :: state()) ->
-  {ok, Requests :: list(), NewState :: state()}.
+            {ok, Requests :: list(), NewState :: state()}.
 
 -optional_callbacks([
   start_requests/1
@@ -54,14 +58,13 @@ start_link(Module, Args, Options) ->
 
 %% @private
 do_start(Link, Module, Args, Options)
-when is_atom(Link), is_atom(Module), is_list(Options) ->
+  when is_atom(Link), is_atom(Module), is_list(Options) ->
   {Name, SpiderOpts, GenServerOpts} = parse_opts(Options),
   GenServerArgs = {Module, Args, SpiderOpts},
   gen_start(Link, Name, GenServerArgs, GenServerOpts).
 
 -spec stop(spider()) -> ok.
-stop(Spider) ->
-  gen_server:stop(Spider).
+stop(Spider) -> gen_server:stop(Spider).
 
 %% @private
 gen_start(Link, nil, Args, Opts) ->
@@ -80,35 +83,33 @@ init({Module, Args, Opts}) ->
   % traps exit signals so we can clean up when terminated by supervisor.
   process_flag(trap_exit, true),
 
-  Spider = #spider{module=Module, options=Opts},
+  Spider = #spider{module = Module, options = Opts},
 
-  case erlang:apply(Module, init, [Args]) of
+  case Module:init(Args) of
     {ok, State} ->
-      % returns 0 timeout to start the spider immediately.
-      {ok, Spider#spider{state=State}, 0};
+    % returns 0 timeout to start the spider immediately.
+    Delay = proplists:get_value(delay, Opts, 0),
+    {ok, Spider#spider{state = State}, Delay};
     {ok, State, Delay} when is_integer(Delay) ->
-      {ok, Spider#spider{state=State}, Delay};
-    Else ->
-      Else
+    {ok, Spider#spider{state = State}, Delay};
+    Else -> Else
   end.
 
 %% @private
-handle_call(_, _From, Spider) ->
-  {reply, ok, Spider}.
+handle_call(_, _From, Spider) -> {reply, ok, Spider}.
 
 %% @private
-handle_cast(stop, Spider) ->
-  {stop, normal, Spider}.
+handle_cast(stop, Spider) -> {stop, normal, Spider}.
 
 %% @private
 %% This get called on the initial crawl due to the timeout of 0.
 handle_info(timeout, Spider) ->
-  #spider{module=Module, options=Opts, state=State} = Spider,
+  #spider{module = Module, options = Opts, state = State} = Spider,
   case proplists:get_value(start_urls, Opts, []) of
     [] ->
       case Module:start_requests(State) of
         {ok, _Requests, NewState} ->
-          {noreply, Spider#spider{state=NewState}};
+          {noreply, Spider#spider{state = NewState}};
         _Else ->
           {stop, invalid_return, Spider}
       end;
@@ -129,12 +130,10 @@ terminate(normal, _Spider) ->
   ok;
 
 terminate(shutdown, _Spider) ->
-  io:format("terminate ~p~n", [shutdown]),
   % ..code for cleaning up here..
   ok;
 
-terminate(_, _Spider) ->
-  ok.
+terminate(_, _Spider) -> ok.
 
 code_change(_OldVsn, Spider, _Extra) ->
   % ..code to convert state (and more) during code change
@@ -154,7 +153,7 @@ code_change(_OldVsn, Spider, _Extra) ->
 %% @private
 -spec parse_opts([option()]) -> {name(), [option()], [option()]}.
 parse_opts(Options) ->
-  OptionKeys = [name, start_urls, allowed_domains],
+  OptionKeys = [name, start_urls, allowed_domains, delay],
   {Lists, GenServerOpts} = proplists:split(Options, OptionKeys),
   SpiderOpts = lists:flatten(Lists),
 

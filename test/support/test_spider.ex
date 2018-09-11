@@ -17,12 +17,12 @@ defmodule TestSpider do
 
   ## API
   @spec start([callback], [GenSpider.option()]) :: :ignore | {:error, any()} | {:ok, pid()}
-  def start(callbacks, options \\ []) do
+  def start(callbacks \\ [], options \\ []) do
     GenSpider.start(__MODULE__, callbacks, options)
   end
 
   @spec start_link([callback], [GenSpider.option()]) :: :ignore | {:error, any()} | {:ok, pid()}
-  def start_link(callbacks, options \\ []) do
+  def start_link(callbacks \\ [], options \\ []) do
     GenSpider.start_link(__MODULE__, callbacks, options)
   end
 

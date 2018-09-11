@@ -7,6 +7,13 @@ defmodule GenSpider.MixProject do
     [
       app: :gen_spider,
       version: @version,
+      name: "GenSpider",
+      source_url: "https://github.com/sntran/gen_spider",
+      homepage_url: "http://sntran.github.io/gen_spider",
+      description: """
+      A behaviour for defining Spiders that crawl and parse pages
+      for a particular site (or, in some cases, a group of sites).
+      """,
       elixir: "~> 1.6",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
@@ -14,13 +21,13 @@ defmodule GenSpider.MixProject do
       package: package(),
       docs: docs(),
       aliases: aliases(),
-      name: "GenSpider",
-      source_url: "https://github.com/sntran/gen_spider",
-      homepage_url: "http://sntran.github.io/gen_spider",
-      description: """
-      A behaviour for defining Spiders that crawl and parse pages
-      for a particular site (or, in some cases, a group of sites).
-      """
+      test_coverage: [tool: ExCoveralls],
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test
+      ]
     ]
   end
 
@@ -44,6 +51,7 @@ defmodule GenSpider.MixProject do
       {:hackney, "~> 1.13"},
       # Analysis and formatting tools
       {:dialyxir, "~> 1.0.0-rc.3", only: [:dev], runtime: false},
+      {:excoveralls, "~> 0.10", only: [:test]},
       # Helpers
       {:git_hooks, "~> 0.2.0", only: [:dev]},
       {:mix_test_watch, "~> 0.8", only: [:dev], runtime: false}
@@ -71,7 +79,7 @@ defmodule GenSpider.MixProject do
   defp aliases do
     [
       format: ["format --check-equivalent"],
-      test: ["test --cover --stale"]
+      test: ["test --cover"]
     ]
   end
 end
