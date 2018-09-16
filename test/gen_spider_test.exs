@@ -3,11 +3,33 @@ defmodule GenSpiderTest do
   doctest GenSpider
 
   setup_all do
-    {:ok, _} = Registry.start_link(keys: :unique, name: Registry.GenSpiderTest)
-
+    start_supervised({Registry, keys: :unique, name: Registry.GenSpiderTest})
     start_supervised({DynamicSupervisor, strategy: :one_for_one, name: GenSpider.TestSupervisor})
 
-    :ok
+    # A simple HTTP Server for testing.
+    :inets.start()
+
+    {:ok, httpd} =
+      :inets.start(:httpd,
+        port: 0,
+        server_name: 'localhost',
+        server_root: 'test/fixtures',
+        document_root: 'test/fixtures',
+        bind_address: 'localhost',
+        directory_index: ['index.html']
+      )
+
+    [port: port] = :httpd.info(httpd, [:port])
+
+    {
+      :ok,
+      [
+        start_urls: [
+          "http://localhost:#{port}",
+          "http://localhost:#{port}/about"
+        ]
+      ]
+    }
   end
 
   describe "start/3" do
@@ -125,8 +147,8 @@ defmodule GenSpiderTest do
       :ok
     end
 
-    test "is called when URLs are not provided in option for `start/3`" do
-      TestSpider.start(
+    test "is called if provided" do
+      TestSpider.start_link(
         start_requests: fn _state ->
           Kernel.send(:tester, {:called_back, :start_requests, 1})
         end
@@ -136,23 +158,8 @@ defmodule GenSpiderTest do
                       "@callback start_requests/1 was not called"
     end
 
-    test "is not called when URLs are provided in option for `start/3`" do
-      TestSpider.start(
-        [
-          start_requests: fn _state ->
-            Kernel.send(:tester, {:called_back, :start_requests, 1})
-          end
-        ],
-        start_urls: ["http://www.example.com"]
-      )
-
-      refute_receive {:called_back, :start_requests, 1},
-                     100,
-                     "@callback start_requests/1 was not supposed to be called"
-    end
-
     test "will be delayed if specified in the return of @callback init/1" do
-      TestSpider.start(
+      TestSpider.start_link(
         init: fn args ->
           {:ok, args, 100}
         end,
@@ -171,7 +178,7 @@ defmodule GenSpiderTest do
     end
 
     test "will be delayed if specified in option for `start/3`" do
-      TestSpider.start(
+      TestSpider.start_link(
         [
           start_requests: fn _state ->
             Kernel.send(:tester, {:called_back, :start_requests, 1})
@@ -190,7 +197,7 @@ defmodule GenSpiderTest do
     end
 
     test "will be delayed by value in the return of @callback init/1 rather than delay option" do
-      TestSpider.start(
+      TestSpider.start_link(
         [
           init: fn args ->
             {:ok, args, 100}
@@ -213,10 +220,10 @@ defmodule GenSpiderTest do
 
     test "must return list of Requests" do
       {:ok, pid1} = TestSpider.start_link(start_requests: fn _state -> :ok end)
-      assert_receive {:EXIT, ^pid1, :invalid_return}
+      assert_receive {:EXIT, ^pid1, {:shutdown, :invalid_return}}
 
       {:ok, pid2} =
-        TestSpider.start(
+        TestSpider.start_link(
           start_requests: fn state ->
             {:ok, [], state}
           end
@@ -224,16 +231,114 @@ defmodule GenSpiderTest do
 
       refute_receive {:EXIT, ^pid2, :invalid_return}
     end
+  end
 
-    test "is optional even when there is no `start_urls`" do
-      {:ok, pid} =
-        TestSpider.start(
-          init: fn args ->
-            {:ok, args, 100}
+  describe "@callback parse/2" do
+    setup do
+      Process.flag(:trap_exit, true)
+
+      :ok
+    end
+
+    test "is not called if no `start_urls` and no `start_requests` are provided" do
+      TestSpider.start_link(
+        parse: fn _response, _state ->
+          Kernel.send(:tester, {:called_back, :parse, 2})
+        end
+      )
+
+      refute_receive {:called_back, :parse, 2}, 100, "@callback parse/2 should not be called"
+    end
+
+    test "is called when `start_urls` is provided as option for `start_link/3`", context do
+      TestSpider.start_link(
+        [
+          parse: fn _response, _state ->
+            Kernel.send(:tester, {:called_back, :parse, 2})
           end
+        ],
+        start_urls: context[:start_urls]
+      )
+
+      assert_receive {:called_back, :parse, 2}, 100, "@callback parse/2 should be called"
+    end
+
+    test "is called with a response body", context do
+      TestSpider.start_link(
+        [
+          parse: fn response, _state ->
+            Kernel.send(:tester, {:called_back, :parse, response})
+          end
+        ],
+        start_urls: context[:start_urls]
+      )
+
+      assert_receive {:called_back, :parse, response}, 100, "@callback parse/2 should be called"
+      assert response.body
+    end
+
+    test "is called with the body of the requested URL", context do
+      body = File.read!("test/fixtures/index.html")
+
+      TestSpider.start_link(
+        [
+          parse: fn response, _state ->
+            Kernel.send(:tester, {:called_back, :parse, response})
+          end
+        ],
+        start_urls: context[:start_urls]
+      )
+
+      assert_receive {:called_back, :parse, response}, 100, "@callback parse/2 should be called"
+      assert response.body === body
+    end
+
+    test "is called with requested URL in the response", context do
+      urls = context[:start_urls]
+
+      TestSpider.start_link(
+        [
+          parse: fn response, _state ->
+            Kernel.send(:tester, {:called_back, :parse, response.url})
+          end
+        ],
+        start_urls: urls
+      )
+
+      assert_receive {:called_back, :parse, url}, 100, "@callback parse/2 should be called"
+      assert Enum.any?(urls, fn u -> u == url end)
+    end
+
+    test "is not called with invalid URL and stop the spider" do
+      {:ok, pid} =
+        TestSpider.start_link(
+          [
+            parse: fn _response, _state ->
+              Kernel.send(:tester, {:called_back, :parse, 1})
+            end
+          ],
+          start_urls: ["foo://bar"]
         )
 
-      refute_receive {:EXIT, ^pid, :invalid_return}
+      refute_receive {:called_back, :parse, 1}, 100, "@callback parse/2 should not be called"
+      assert_receive {:EXIT, ^pid, {:shutdown, :nxdomain}}
+    end
+
+    test "is called with each URLs in `start_urls`", context do
+      urls = context[:start_urls]
+
+      TestSpider.start_link(
+        [
+          parse: fn %{url: url}, _state ->
+            Kernel.send(:tester, {:called_back, :parse, url})
+          end
+        ],
+        start_urls: urls
+      )
+
+      Enum.each(urls, fn url ->
+        assert_receive {:called_back, :parse, ^url}, 100
+      end)
     end
   end
 end

@@ -65,6 +65,20 @@ defmodule TestSpider do
     end
   end
 
+  @impl true
+  @spec parse(any(), spider()) :: {:ok, term(), state()}
+  def parse(response, spider) do
+    state = spider[:state]
+
+    case maybe_apply(spider, :parse, [response, spider], {:ok, response, state}) do
+      {:ok, response, state} ->
+        {:ok, response, Keyword.put(spider, :state, state)}
+
+      other ->
+        other
+    end
+  end
+
   defp maybe_apply(spider, fun, args, default_reply) do
     case Keyword.get(spider, fun) do
       nil ->

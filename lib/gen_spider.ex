@@ -37,12 +37,14 @@ defmodule GenSpider do
 
   # Define the callbacks for `GenSpider`
   @callback init(any) ::
-              {:ok, state}
-              | {:ok, state, timeout | :hibernate}
+              {:ok, state()}
+              | {:ok, state(), timeout | :hibernate}
               | :ignore
-              | {:stop, reason :: term}
+              | {:stop, reason() :: term()}
 
-  @callback start_requests(state) :: {:ok, list, state}
+  @callback start_requests(state()) :: {:ok, list(), state()}
+
+  @callback parse(:gen_spider.response(), state()) :: {:ok, term(), state()}
 
   @doc """
   Elixir-specific child specification for a spider to be supervised.

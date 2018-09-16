@@ -20,8 +20,11 @@
 ]).
 
 -export_type([
+  t/0,
   name/0,
-  option/0
+  option/0,
+  request/0,
+  response/0
 ]).
 
 -include("gen_spider.hrl").
@@ -32,6 +35,8 @@
   options :: [option()],
   state :: state()
 }).
+
+-type t() :: #spider{}.
 
 -callback init(Args :: term()) ->
             {ok, State :: state()}
@@ -87,11 +92,11 @@ init({Module, Args, Opts}) ->
 
   case Module:init(Args) of
     {ok, State} ->
-    % returns 0 timeout to start the spider immediately.
-    Delay = proplists:get_value(delay, Opts, 0),
-    {ok, Spider#spider{state = State}, Delay};
+      % returns 0 timeout to start the spider immediately.
+      Delay = proplists:get_value(delay, Opts, 0),
+      {ok, Spider#spider{state = State}, Delay};
     {ok, State, Delay} when is_integer(Delay) ->
-    {ok, Spider#spider{state = State}, Delay};
+      {ok, Spider#spider{state = State}, Delay};
     Else -> Else
   end.
 
@@ -104,20 +109,27 @@ handle_cast(stop, Spider) -> {stop, normal, Spider}.
 %% @private
 %% This get called on the initial crawl due to the timeout of 0.
 handle_info(timeout, Spider) ->
-  #spider{module = Module, options = Opts, state = State} = Spider,
-  case proplists:get_value(start_urls, Opts, []) of
-    [] ->
-      case Module:start_requests(State) of
-        {ok, _Requests, NewState} ->
-          {noreply, Spider#spider{state = NewState}};
-        _Else ->
-          {stop, invalid_return, Spider}
-      end;
-    Urls when is_list(Urls) ->
+  crawl(Spider);
+
+handle_info({'DOWN', _Ref, process, _Pid, normal}, Spider) ->
+  % Sent from request monitor when request process finishes.
+  {noreply, Spider};
+
+handle_info({response, Response}, Spider) ->
+  #spider{module = Module, state = State} = Spider,
+  case Module:parse(Response, State) of
+    {ok, _Data, NewState} ->
+      {noreply, Spider#spider{state = NewState}};
+    _Else ->
       {noreply, Spider}
   end;
 
-%% @private
+handle_info({error, Reason}, Spider) ->
+  % ATM, assumes error come from HTTP request.
+  % @TODO: Backoff and retry request.
+  % @TODO: Handles other errors if needed.
+  {stop, {shutdown, Reason}, Spider};
+
 % handles exit message, if the gen_server is linked to other processes (than
 % the supervisor) and trapping exit signals.
 handle_info({'EXIT', _Pid, _Reason}, Spider) ->
@@ -163,3 +175,62 @@ parse_opts(Options) ->
     {value, {name, Name}, SpiderOpts1} ->
       {Name, SpiderOpts1, GenServerOpts}
   end.
+
+%%-------------------------------------------------------------------
+%% @doc Performs asynchronous requests to a spider's URLs
+%% @end
+%%-------------------------------------------------------------------
+%% @private
+-spec crawl(t()) -> {noreply, t()} | {stop, {shutdown, invalid_return}, t()}.
+crawl(Spider) ->
+  #spider{module = Module, options = Opts, state = State} = Spider,
+  case proplists:get_value(start_urls, Opts, []) of
+    [] ->
+      case Module:start_requests(State) of
+        {ok, _Requests, NewState} ->
+          {noreply, Spider#spider{state = NewState}};
+        _Else ->
+          % Order the spider to shutdown.
+          {stop, {shutdown, invalid_return}, Spider}
+      end;
+    Urls when is_list(Urls) ->
+      [request(Url) || Url <- Urls],
+      {noreply, Spider}
+  end.
+
+-spec request(url() | request()) -> {pid(), reference()}.
+request(Url) when is_binary(Url) ->
+  request([{method, get}, {url, Url}]);
+
+request(Args) ->
+  Method = proplists:get_value(method, Args, get),
+  Url = proplists:get_value(url, Args, <<>>),
+  Headers = proplists:get_value(headers, Args, []),
+  Payload = proplists:get_value(payload, Args, <<>>),
+
+  From = self(),
+  Options = [
+    % {async},
+    {follow_redirect, true},
+    {max_redirect, 5},
+    {timeout, 30000},
+    {recv_timeout, 15000}
+  ],
+
+  erlang:spawn_monitor(fun() ->
+    case hackney:request(Method, Url, Headers, Payload, Options) of
+      {ok, StatusCode, RespHeaders, ClientRef} ->
+        {ok, Body} = hackney:body(ClientRef),
+        Response = #{
+          url => Url,
+          status => StatusCode,
+          headers => RespHeaders,
+          body => Body,
+          % @TODO: Figure out the final shape of Request.
+          request => Args
+        },
+        From ! {response, Response};
+      {error, _Reason} = Error ->
+        From ! Error
+    end
+  end).
