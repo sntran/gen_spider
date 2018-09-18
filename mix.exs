@@ -67,7 +67,10 @@ defmodule GenSpider.MixProject do
       ],
       licenses: ["Apache 2.0"],
       links: %{github: "https://github.com/sntran/gen_spider"},
-      files: ~w(assets lib priv) ++ ~w(CHANGELOG.md LICENSE mix.exs README.md)
+      files:
+        ~w(assets examples include lib priv src) ++
+          ~w(.formatter.exs mix.exs CHANGELOG.md LICENSE README.md Emakefile),
+      exclude_patterns: [".DS_Store"]
     ]
   end
 
