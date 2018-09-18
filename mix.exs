@@ -52,6 +52,8 @@ defmodule GenSpider.MixProject do
       # Analysis and formatting tools
       {:dialyxir, "~> 1.0.0-rc.3", only: [:dev], runtime: false},
       {:excoveralls, "~> 0.10", only: [:test]},
+      # Documentation
+      {:ex_doc, "~> 0.19", only: :dev, runtime: false},
       # Helpers
       {:git_hooks, "~> 0.2.0", only: [:dev]},
       {:mix_test_watch, "~> 0.8", only: [:dev], runtime: false}

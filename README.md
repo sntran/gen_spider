@@ -17,11 +17,14 @@ parsing pages for a particular site (or, in some cases, a group of sites).
 
 ## Hello World
 
-@TODO: Add both Erlang and Elixir versions of a simple spider implementation.
+The basic Quotes Spider from Scrapy is implemented with `gen_spider` in both
+[Erlang](examples/quotes_spider.erl) and [Elixir](examples/quotes_spider.ex).
+
+<!-- MDOC !-->
 
 ## Generic Spiders
 
-GenSpider comes with some useful generic spiders that can be found in the
+GenSpider also comes with some useful generic spiders that can be found in the
 [examples](examples) directory. Their aim is to provide convenient functionality
 for a few common scraping cases, like following all links on a site based on
 certain rules, crawling from Sitemaps, or parsing an XML/CSV feed.

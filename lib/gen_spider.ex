@@ -1,8 +1,21 @@
 defmodule GenSpider do
-  @moduledoc "README.md"
-             |> File.read!()
-             |> String.split("<!-- MDOC !-->")
-             |> Enum.fetch!(1)
+  @readme "README.md"
+          |> File.read!()
+          |> String.split("<!-- MDOC !-->")
+
+  @moduledoc """
+  #{Enum.fetch!(@readme, 1)}
+
+  ```erlang
+  #{File.read!("examples/quotes_spider.erl")}
+  ```
+
+  ```elixir
+  #{File.read!("examples/quotes_spider.ex")}
+  ```
+
+  #{Enum.fetch!(@readme, 2)}
+  """
 
   require Logger
 
@@ -45,6 +58,10 @@ defmodule GenSpider do
   @callback start_requests(state()) :: {:ok, list(), state()}
 
   @callback parse(:gen_spider.response(), state()) :: {:ok, term(), state()}
+
+  @optional_callbacks [
+    start_requests: 1
+  ]
 
   @doc """
   Elixir-specific child specification for a spider to be supervised.
